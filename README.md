@@ -1,6 +1,4 @@
-<img src="docs/icon.png" width="96" alt="Clarity icon">
-
-# Clarity
+# <img src="docs/icon.png" width="48" align="center" alt=""> Clarity
 
 A small Mac app that makes an external monitor show everything bigger **and keeps text sharp**, and gives that monitor its own colour controls. It was built for a Philips 346B1C (3440 × 1440) on an M5 MacBook, but works with any external monitor. It needs no admin rights.
 
