@@ -1,6 +1,10 @@
+<img src="docs/icon.png" width="96" alt="Clarity icon">
+
 # Clarity
 
 A small Mac app that makes an external monitor show everything bigger **and keeps text sharp**, and gives that monitor its own colour controls. It was built for a Philips 346B1C (3440 × 1440) on an M5 MacBook, but works with any external monitor. It needs no admin rights.
+
+<img src="docs/screenshot.png" width="360" alt="Clarity's window: size at 115% (looks like 2992 × 1252), colour 10% warmer">
 
 ## Using it
 
@@ -88,7 +92,8 @@ build/Clarity.app/Contents/MacOS/Clarity --selftest 1.2 5
 | `Sources/ClarityApp.swift` | The window, the optional menu bar icon, running in the background |
 | `Sources/MenuView.swift` | The panel shown in the window and the menu bar |
 | `Sources/SelfTest.swift` | The `--selftest` mode |
-| `Support/` | Private API header and `Info.plist` |
+| `Support/` | Private API header, `Info.plist` and the app icon |
+| `scripts/make-icon.swift` | Redraws the app icon: `swift scripts/make-icon.swift` |
 
 ## Known limits
 
