@@ -1,10 +1,12 @@
 # Clarity
 
-A small menu bar app that makes an external monitor show everything bigger **and keeps text sharp**, and gives that monitor its own colour controls. It was built for a Philips 346B1C (3440 × 1440) on an M5 MacBook, but works with any external monitor. It needs no admin rights.
+A small Mac app that makes an external monitor show everything bigger **and keeps text sharp**, and gives that monitor its own colour controls. It was built for a Philips 346B1C (3440 × 1440) on an M5 MacBook, but works with any external monitor. It needs no admin rights.
 
 ## Using it
 
-Click the magnifying-glass sparkle icon in the menu bar.
+Open Clarity and its window appears. Close the window once you're set up: Clarity keeps running in the background with no Dock icon, and your monitor stays scaled. To change something later, open Clarity again (Spotlight, Finder or Launchpad) and the window comes back. When it starts at login, it applies your settings without opening the window.
+
+If you'd rather reach it from the menu bar, turn on **Menu bar icon** at the bottom of the window (off by default).
 
 **Size**
 - Drag the slider or pick a preset. 120% means everything is 20% bigger. On the Philips that "looks like" 2866 × 1200. The change is saved straight away.
@@ -19,7 +21,7 @@ Click the magnifying-glass sparkle icon in the menu bar.
 **Other**
 - **Open at login** starts Clarity automatically. Your settings are re-applied whenever the monitor is plugged in.
 - **Turn everything off** resets that display to native size with neutral colours.
-- **Quitting Clarity always returns the monitor to normal.** If anything ever looks wrong, quit the app (⌘Q in its menu, or Activity Monitor).
+- **Quitting Clarity always returns the monitor to normal.** Closing the window doesn't quit it; use **Quit Clarity** (⌘Q). If anything ever looks wrong, quit the app (or use Activity Monitor).
 
 ## How the sharp scaling works
 
@@ -83,7 +85,8 @@ build/Clarity.app/Contents/MacOS/Clarity --selftest 1.2 5
 | `Sources/Displays.swift` | Finds external monitors and their native resolution |
 | `Sources/Arrangement.swift` | Records and restores where the screens sit around the scaled monitor |
 | `Sources/AppModel.swift` | Saved settings, display plug/unplug, sleep/wake |
-| `Sources/MenuView.swift` | The menu bar panel |
+| `Sources/ClarityApp.swift` | The window, the optional menu bar icon, running in the background |
+| `Sources/MenuView.swift` | The panel shown in the window and the menu bar |
 | `Sources/SelfTest.swift` | The `--selftest` mode |
 | `Support/` | Private API header and `Info.plist` |
 
@@ -92,3 +95,7 @@ build/Clarity.app/Contents/MacOS/Clarity --selftest 1.2 5
 - The scaled monitor runs at 60 Hz, the virtual display's refresh rate. The Philips is already at 60 Hz, so nothing is lost there.
 - Settings are saved per monitor (by vendor, model and serial number), so a different monitor starts at native size.
 - HiDPI rendering gives the GPU more pixels to draw (5732 × 2400 instead of 3440 × 1440). The M5 handles this easily.
+
+## Licence
+
+MIT. See [LICENSE](LICENSE).

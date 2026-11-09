@@ -5,6 +5,7 @@ struct MenuView: View {
     @State private var zoomDraft: Double = 1.0
     @State private var draggingZoom = false
     @State private var showWhiteBalance = false
+    @AppStorage(AppDelegate.menuBarIconKey) private var showMenuBarIcon = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -238,6 +239,19 @@ struct MenuView: View {
                 Text("Open at login").font(.callout)
                 Spacer()
                 Toggle("Open at login", isOn: Binding(get: { model.launchAtLogin }, set: { model.setLaunchAtLogin($0) }))
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                    .labelsHidden()
+            }
+            HStack {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Menu bar icon").font(.callout)
+                    Text("Without it, open Clarity again to get this window back.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Toggle("Menu bar icon", isOn: $showMenuBarIcon)
                     .toggleStyle(.switch)
                     .controlSize(.small)
                     .labelsHidden()
