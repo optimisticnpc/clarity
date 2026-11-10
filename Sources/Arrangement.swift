@@ -40,9 +40,10 @@ struct Arrangement {
     /// `anchor` at 0,0, which makes it the main display; otherwise the previous main display stays
     /// main. `previousAnchor` is the display `anchor` replaced (the physical monitor, when a virtual
     /// display has just taken its place), so a main-display role it held carries over.
+    /// `.permanently` saves the layout in macOS's display settings, as System Settings would.
     @discardableResult
     func apply(around anchor: CGDirectDisplayID, anchorBecomesMain: Bool,
-               previousAnchor: CGDirectDisplayID? = nil) -> Bool {
+               previousAnchor: CGDirectDisplayID? = nil, option: CGConfigureOption = .forSession) -> Bool {
         let size = CGDisplayBounds(anchor).size
         var origins: [CGDirectDisplayID: CGPoint] = [anchor: .zero]
         for n in neighbours where CGDisplayIsActive(n.id) != 0 {
@@ -65,7 +66,7 @@ struct Arrangement {
         for (id, o) in origins {
             CGConfigureDisplayOrigin(config, id, Int32((o.x - mainOrigin.x).rounded()), Int32((o.y - mainOrigin.y).rounded()))
         }
-        return CGCompleteDisplayConfiguration(config, .forSession) == .success
+        return CGCompleteDisplayConfiguration(config, option) == .success
     }
 
     /// Screens that are drawn to (a monitor that only mirrors another is left out).

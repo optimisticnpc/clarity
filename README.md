@@ -45,7 +45,7 @@ To macOS, swapping the real monitor for the virtual one looks like unplugging on
 
 While a monitor is scaled, Clarity makes it the **main display** (switch: *Main display while scaled*, on by default). Without this, a three-finger swipe with the pointer on the scaled monitor switches the MacBook's desktops instead. The Dock works out which screen a swipe is on from the physical monitor under the pointer, finds that it has no desktops of its own (they belong to the virtual display it mirrors), and falls back to the main display. With the scaled monitor as main, that fallback lands on the right screen, and swipes on the MacBook still work normally.
 
-macOS keeps the main display's desktops (and their windows) as one set that follows whichever screen is main. If the MacBook is main whenever Clarity isn't running, that set hops from the MacBook to the monitor every time Clarity starts, which piles the MacBook's windows onto the monitor. To stop this, make the monitor the main display in macOS itself, once: quit Clarity, open System Settings → Displays → Arrange, and drag the white menu bar onto the monitor. Then the main set stays on the monitor whether Clarity is running or not.
+macOS keeps the main display's desktops (and their windows) as one set that follows whichever screen is main. If the MacBook were main whenever Clarity isn't running, that set would hop from the MacBook to the monitor every time Clarity starts, piling the MacBook's windows onto the monitor. So when scaling starts, Clarity also saves the monitor as the main display in macOS's own settings (the same as dragging the white menu bar onto it in System Settings → Displays → Arrange). The set then stays on the monitor whether Clarity is running or not.
 
 ### Screen arrangement
 

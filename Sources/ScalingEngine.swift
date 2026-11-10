@@ -122,6 +122,16 @@ final class ScalingEngine {
         // Where the other screens sit around the monitor, to rebuild around the virtual display.
         let layout = Arrangement.capture(around: display.id)
 
+        // macOS keeps the main display's desktops (and their windows) as one set that moves to
+        // whichever screen is main. If the MacBook were main whenever Clarity isn't running, that
+        // set would hop between the MacBook and the monitor every time Clarity starts or quits,
+        // dragging the MacBook's windows along. So save the monitor itself as the main display in
+        // macOS's settings: the set then stays on the monitor whether Clarity is running or not.
+        if makeMain, CGDisplayIsMain(display.id) == 0 {
+            layout.apply(around: display.id, anchorBecomesMain: true, option: .permanently)
+            try? await Task.sleep(for: .milliseconds(500))
+        }
+
         let descriptor = CGVirtualDisplayDescriptor()
         descriptor.queue = .main
         descriptor.name = "Clarity · \(display.name)"
