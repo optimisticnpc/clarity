@@ -90,6 +90,7 @@ build/Clarity.app/Contents/MacOS/Clarity --selftest 1.2 5
 | `Sources/ClarityApp.swift` | The window, the optional menu bar icon, running in the background |
 | `Sources/MenuView.swift` | The panel shown in the window and the menu bar |
 | `Sources/SelfTest.swift` | The `--selftest` mode |
+| `Sources/EventLog.swift` | Writes `~/Library/Logs/Clarity.log`: plug/unplug, sleep/wake, and which screen each desktop and app is on |
 | `Support/` | Private API header, `Info.plist` and the app icon |
 | `scripts/make-icon.swift` | Redraws the app icon: `swift scripts/make-icon.swift` |
 

@@ -55,12 +55,22 @@ final class AppModel: ObservableObject {
         CGDisplayRegisterReconfigurationCallback(displayReconfigured, nil)
         NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didWakeNotification, object: nil, queue: .main
-        ) { _ in MainActor.assumeIsolated { AppModel.shared?.scheduleRefresh(after: 1.5) } }
+        ) { _ in MainActor.assumeIsolated {
+            EventLog.record("Woke from sleep")
+            AppModel.shared?.scheduleRefresh(after: 1.5)
+        } }
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.willSleepNotification, object: nil, queue: .main
+        ) { _ in EventLog.record("Going to sleep") }
         reassertTimer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { _ in
             MainActor.assumeIsolated { AppModel.shared?.color.reassertIfNeeded() }
         }
         refreshDisplays()
-        Task { await applySavedProfiles() }
+        EventLog.record("Clarity started")
+        Task {
+            await applySavedProfiles()
+            EventLog.record("Saved settings applied at launch")
+        }
     }
 
     // MARK: - Current display
@@ -144,6 +154,7 @@ final class AppModel: ObservableObject {
     }
 
     func shutDown() {
+        EventLog.record("Clarity quitting")
         scaling.stopAll()
         color.resetEverything()
         saveNow()
@@ -173,14 +184,26 @@ final class AppModel: ObservableObject {
 
     private func handleDisplayChange() async {
         guard !busy else { scheduleRefresh(); return }
+        let before = Set(displays.map(\.key))
         refreshDisplays()
         let onlineKeys = Set(displays.map(\.key))
+        let added = onlineKeys.subtracting(before), removed = before.subtracting(onlineKeys)
+        let changed = !added.isEmpty || !removed.isEmpty
+        if changed {
+            EventLog.record("Monitors changed: plugged in \(added.sorted()), unplugged \(removed.sorted())")
+        }
         // A monitor that was unplugged while scaled would leave an invisible virtual screen behind.
         for key in scaling.sessions.keys where !onlineKeys.contains(key) {
             scaling.stop(key)
         }
         await applySavedProfiles()
         color.reassertIfNeeded()
+        if changed {
+            EventLog.record("Settings re-applied after the monitor change")
+            // Where things ended up once macOS has finished shuffling.
+            try? await Task.sleep(for: .seconds(5))
+            EventLog.record("5 seconds later")
+        }
     }
 
     private func refreshDisplays() {
