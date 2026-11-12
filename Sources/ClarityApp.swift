@@ -62,7 +62,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     func showWindow() {
         if window == nil {
-            let hosting = NSHostingController(rootView: MenuView().environmentObject(model))
+            let content = MenuView().environmentObject(model)
+                .fixedSize(horizontal: false, vertical: true)
+                .onGeometryChange(for: CGSize.self, of: { $0.size }) { [weak self] size in
+                    // Resize after the current layout pass, never during it (see below).
+                    DispatchQueue.main.async { self?.fitWindow(to: size) }
+                }
+            let hosting = NSHostingController(rootView: content)
+            // No automatic sizing constraints between SwiftUI and the window. With them, AppKit
+            // crashed now and then ("needs update constraints" during a constraints pass) when
+            // the screens changed while the window was opening. The window is sized by hand.
+            hosting.sizingOptions = []
             let window = NSWindow(contentViewController: hosting)
             window.title = "Clarity"
             window.styleMask = [.titled, .closable, .miniaturizable]
@@ -76,6 +86,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         NSApp.setActivationPolicy(.regular)
         window?.makeKeyAndOrderFront(nil)
         NSApp.activate()
+    }
+
+    /// Fits the window to the content's height, keeping its top edge where it is.
+    private func fitWindow(to size: CGSize) {
+        guard let window, size.width > 0, size.height > 0 else { return }
+        let current = window.contentRect(forFrameRect: window.frame)
+        guard abs(current.height - size.height) > 0.5 || abs(current.width - size.width) > 0.5 else { return }
+        var frame = window.frameRect(forContentRect: CGRect(origin: current.origin, size: size))
+        frame.origin.y = window.frame.maxY - frame.height
+        window.setFrame(frame, display: true)
     }
 
     func windowWillClose(_ notification: Notification) {

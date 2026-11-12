@@ -41,6 +41,13 @@ final class AppModel: ObservableObject {
     private var refreshWork: DispatchWorkItem?
     private var saveWork: DispatchWorkItem?
     private var reassertTimer: Timer?
+    /// A display change is waiting to be handled, or is being handled.
+    private var pendingRefresh = false
+    /// Windows that were full screen the last time nothing was changing (see FullScreenKeeper).
+    private var fullScreenBefore: [CGWindowID: pid_t] = [:]
+    /// False until Clarity has the Accessibility permission it needs to put windows back into
+    /// full screen.
+    @Published private(set) var canRestoreFullScreen = FullScreenKeeper.isAllowed
 
     /// `live: false` builds a read-only model for rendering the UI to an image: it lists displays
     /// but never changes them.
@@ -63,14 +70,49 @@ final class AppModel: ObservableObject {
             forName: NSWorkspace.willSleepNotification, object: nil, queue: .main
         ) { _ in EventLog.record("Going to sleep") }
         reassertTimer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { _ in
-            MainActor.assumeIsolated { AppModel.shared?.color.reassertIfNeeded() }
+            MainActor.assumeIsolated { AppModel.shared?.everyFewSeconds() }
         }
         refreshDisplays()
+        fullScreenBefore = FullScreenKeeper.current()
         EventLog.record("Clarity started")
         Task {
             await applySavedProfiles()
             EventLog.record("Saved settings applied at launch")
+            await restoreFullScreen(after: 2)
         }
+    }
+
+    fileprivate func everyFewSeconds() {
+        color.reassertIfNeeded()
+        canRestoreFullScreen = FullScreenKeeper.isAllowed
+        if !busy, !pendingRefresh { fullScreenBefore = FullScreenKeeper.current() }
+        // Note which desktops are the MacBook's while everything is in place, so they can be put
+        // back after the monitor is unplugged and plugged in again (see Desktops).
+        if !busy, !pendingRefresh,
+           scaling.sessions.keys.contains(where: scaling.isSettled) {
+            Desktops.rememberMacBookDesktops()
+        }
+    }
+
+    /// Puts windows that dropped out of full screen during a screen change back into it.
+    private func restoreFullScreen(after seconds: Double) async {
+        guard !fullScreenBefore.isEmpty else { return }
+        try? await Task.sleep(for: .seconds(seconds))
+        let result = FullScreenKeeper.restore(fullScreenBefore)
+        if !result.restored.isEmpty {
+            EventLog.record("Put back into full screen: \(result.restored.joined(separator: ", "))")
+        }
+        if !result.failed.isEmpty {
+            EventLog.record("Left full screen and could not be put back"
+                + (FullScreenKeeper.isAllowed ? "" : " (no Accessibility permission)")
+                + ": \(result.failed.joined(separator: ", "))")
+        }
+        canRestoreFullScreen = FullScreenKeeper.isAllowed
+        fullScreenBefore = FullScreenKeeper.current()
+    }
+
+    func askForAccessibility() {
+        FullScreenKeeper.askForPermission()
     }
 
     // MARK: - Current display
@@ -100,6 +142,7 @@ final class AppModel: ObservableObject {
         Task {
             guard await applyZoom(zoom, to: display) else { return }
             updateProfile(display.key) { $0.zoom = zoom }
+            await restoreFullScreen(after: 1.5)
         }
     }
 
@@ -174,6 +217,7 @@ final class AppModel: ObservableObject {
     // MARK: - Display changes
 
     fileprivate func scheduleRefresh(after delay: Double = 0.6) {
+        pendingRefresh = true
         refreshWork?.cancel()
         let work = DispatchWorkItem { [weak self] in
             Task { @MainActor in await self?.handleDisplayChange() }
@@ -193,7 +237,13 @@ final class AppModel: ObservableObject {
             EventLog.record("Monitors changed: plugged in \(added.sorted()), unplugged \(removed.sorted())")
         }
         // A monitor that was unplugged while scaled would leave an invisible virtual screen behind.
-        for key in scaling.sessions.keys where !onlineKeys.contains(key) {
+        for key in Array(scaling.sessions.keys) where !onlineKeys.contains(key) {
+            await scaling.stopAfterUnplug(key)
+        }
+        // Something else switched the virtual display off while the monitor stayed plugged in: drop
+        // it, and applySavedProfiles below builds a new one.
+        for key in Array(scaling.sessions.keys) where !scaling.virtualIsUp(key) {
+            EventLog.record("The virtual display was switched off; rebuilding it")
             scaling.stop(key)
         }
         await applySavedProfiles()
@@ -204,6 +254,8 @@ final class AppModel: ObservableObject {
             try? await Task.sleep(for: .seconds(5))
             EventLog.record("5 seconds later")
         }
+        await restoreFullScreen(after: changed ? 0 : 2)
+        pendingRefresh = false
     }
 
     private func refreshDisplays() {

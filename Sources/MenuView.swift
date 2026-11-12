@@ -256,6 +256,20 @@ struct MenuView: View {
                     .controlSize(.small)
                     .labelsHidden()
             }
+            if !model.canRestoreFullScreen {
+                HStack {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Keep full-screen apps full screen").font(.callout)
+                        Text("Some apps leave full screen when the monitor is plugged in. Clarity can put them back with Accessibility access.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer()
+                    Button("Allow…") { model.askForAccessibility() }
+                        .controlSize(.small)
+                }
+            }
             HStack {
                 Button("Turn everything off") { model.revertAll(); zoomDraft = 1 }
                 Spacer()

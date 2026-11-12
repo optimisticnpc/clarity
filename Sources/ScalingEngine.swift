@@ -67,6 +67,10 @@ final class ScalingEngine {
     /// pointer, finds it has no desktops of its own (they belong to the virtual display it mirrors),
     /// and falls back to the main display. With the scaled monitor as main, that fallback is right.
     func setZoom(_ zoom: Double, for display: PhysicalDisplay, makeMain: Bool) async throws {
+        if sessions[display.key] != nil, !virtualIsUp(display.key) {
+            // The virtual display was switched off; start over with a fresh one.
+            stop(display.key)
+        }
         if var session = sessions[display.key] {
             let id = session.virtualDisplay.displayID
             let layout = Arrangement.capture(around: id)
@@ -112,6 +116,39 @@ final class ScalingEngine {
         // display, and macOS removes it.
     }
 
+    /// After the monitor is unplugged: removes its virtual display, making sure it is main first.
+    ///
+    /// When the monitor goes, the virtual display it mirrored stays up on its own and macOS makes
+    /// the MacBook main, which swaps their desktops: the MacBook now holds the monitor's, the
+    /// invisible virtual display holds the MacBook's. Removing it like that would file the
+    /// MacBook's desktops under the virtual display, and when the monitor came back as main it
+    /// would take every desktop. So swap back first (virtual display main again), then remove it.
+    /// macOS then merges the monitor's desktops onto the MacBook while remembering which desktops
+    /// are the MacBook's own, and splits them again when the monitor returns (tested on macOS 26).
+    func stopAfterUnplug(_ key: String) async {
+        guard let session = sessions[key] else { return }
+        let id = session.virtualDisplay.displayID
+        if CGDisplayIsActive(id) != 0, CGDisplayIsMain(id) == 0 {
+            Desktops.makeMain(id)
+            try? await Task.sleep(for: .milliseconds(600))
+            EventLog.record("Made the virtual display main again before removing it")
+        }
+        stop(key)
+    }
+
+    /// False if something switched the virtual display off behind Clarity's back.
+    func virtualIsUp(_ key: String) -> Bool {
+        guard let s = sessions[key] else { return false }
+        return CGDisplayIsActive(s.virtualDisplay.displayID) != 0
+    }
+
+    /// The monitor mirrors its virtual display and the virtual display is main.
+    func isSettled(_ key: String) -> Bool {
+        guard let s = sessions[key] else { return false }
+        return CGDisplayMirrorsDisplay(s.physical.id) == s.virtualDisplay.displayID
+            && CGDisplayIsMain(s.virtualDisplay.displayID) != 0
+    }
+
     func stopAll() {
         for key in Array(sessions.keys) { stop(key) }
     }
@@ -148,6 +185,21 @@ final class ScalingEngine {
         guard let virtualDisplay = CGVirtualDisplay(descriptor: descriptor) else { throw ScalingError.createFailed }
         guard virtualDisplay.apply(Self.settings(for: display)) else { throw ScalingError.applyFailed }
         guard await waitUntilOnline(virtualDisplay.displayID) else { throw ScalingError.virtualNeverAppeared }
+
+        // After the monitor was unplugged while the Mac was awake, macOS hands the MacBook's own
+        // desktops back to the virtual display as it comes online (see Desktops). Swap them back
+        // onto the MacBook before mirroring, which would otherwise merge them with the monitor's.
+        try? await Task.sleep(for: .milliseconds(800))
+        if let mac = Desktops.builtIn, Desktops.macBookDesktopsAreOn(virtualDisplay.displayID) {
+            EventLog.record("The MacBook's desktops came back on the virtual display; swapping them back")
+            if CGDisplayIsMain(mac) == 0 {
+                Desktops.makeMain(mac)
+                try? await Task.sleep(for: .milliseconds(600))
+            }
+            Desktops.makeMain(virtualDisplay.displayID)
+            try? await Task.sleep(for: .milliseconds(600))
+            EventLog.record("Swapped")
+        }
 
         let session = Session(physical: display, virtualDisplay: virtualDisplay, zoom: zoom)
         try switchMode(session, to: zoom)

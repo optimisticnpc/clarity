@@ -47,6 +47,17 @@ While a monitor is scaled, Clarity makes it the **main display** (switch: *Main 
 
 macOS keeps the main display's desktops (and their windows) as one set that follows whichever screen is main. If the MacBook were main whenever Clarity isn't running, that set would hop from the MacBook to the monitor every time Clarity starts, piling the MacBook's windows onto the monitor. So when scaling starts, Clarity also saves the monitor as the main display in macOS's own settings (the same as dragging the white menu bar onto it in System Settings → Displays → Arrange). The set then stays on the monitor whether Clarity is running or not.
 
+### Unplugging and plugging the monitor back in
+
+When the monitor is unplugged while the Mac is awake, macOS moves its desktops onto the MacBook, as it does for any monitor. Plugging it back in should split them again: the monitor's desktops back on the monitor, the MacBook's on the MacBook. Two macOS rules, found by testing on macOS 26, decide whether that works:
+
+- A screen that goes away while the Mac is awake has its desktops merged onto the remaining screen, and macOS remembers which they were and hands them back when the screen returns.
+- When the main role moves from one screen to another, the two screens swap desktops.
+
+When the cable comes out, Clarity's virtual display can stay up for a moment while macOS makes the MacBook main, which swaps the desktops: the invisible virtual display ends up holding the MacBook's. Removing it in that state would file the MacBook's desktops under the monitor, and on replug the monitor would take every desktop. So Clarity first makes the virtual display main again, which swaps the desktops back, and only then removes it. As a backstop, Clarity remembers which desktops are the MacBook's, and if they ever come back on the virtual display it swaps them back before mirroring (`Sources/Desktops.swift`).
+
+Some apps (Microsoft Teams so far) leave full screen when the screens change. Clarity notes which windows are full screen, and after each screen change it puts back any that dropped out. macOS adds the restored full-screen desktop at the end of that screen's desktops. This needs the **Accessibility** permission. The Clarity window shows an *Allow…* button until it is granted. Because the app is ad-hoc signed, macOS may ask again after a rebuild.
+
 ### Screen arrangement
 
 macOS re-lays out the screens whenever a display changes resolution, which can undo a vertical stack. Before every size change, Clarity records where each other screen sits relative to the scaled monitor (which edge, and how far along it) and rebuilds the same layout at the new size. When scaling starts, the layout you set for the real monitor in System Settings is carried over to the virtual one.
@@ -90,6 +101,8 @@ build/Clarity.app/Contents/MacOS/Clarity --selftest 1.2 5
 | `Sources/ClarityApp.swift` | The window, the optional menu bar icon, running in the background |
 | `Sources/MenuView.swift` | The panel shown in the window and the menu bar |
 | `Sources/SelfTest.swift` | The `--selftest` mode |
+| `Sources/Desktops.swift` | Reads which desktops are on each screen; keeps the MacBook's desktops on the MacBook across a replug |
+| `Sources/FullScreenKeeper.swift` | Puts windows back into full screen after a screen change (needs Accessibility) |
 | `Sources/EventLog.swift` | Writes `~/Library/Logs/Clarity.log`: plug/unplug, sleep/wake, and which screen each desktop and app is on |
 | `Support/` | Private API header, `Info.plist` and the app icon |
 | `scripts/make-icon.swift` | Redraws the app icon: `swift scripts/make-icon.swift` |
