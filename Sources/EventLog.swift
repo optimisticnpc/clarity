@@ -13,9 +13,19 @@ enum EventLog {
         .appendingPathComponent("Library/Logs/Clarity.log")
 
     static func record(_ event: String) {
-        let stamp = ISO8601DateFormatter.string(from: Date(), timeZone: .current,
-                                                formatOptions: [.withInternetDateTime])
-        write("[\(stamp)] \(event)\n\(snapshot())\n")
+        write("[\(stamp())] \(event)\n\(snapshot())\n")
+    }
+
+    /// A one-line entry without the snapshot, for timing the steps of a plug-in. Cheap enough to
+    /// call in the middle of scaling.
+    static func note(_ event: String) {
+        write("[\(stamp())] \(event)\n")
+    }
+
+    /// Local time to the millisecond, e.g. 2026-11-18T13:32:37.412+13:00.
+    private static func stamp() -> String {
+        ISO8601DateFormatter.string(from: Date(), timeZone: .current,
+                                    formatOptions: [.withInternetDateTime, .withFractionalSeconds])
     }
 
     private static func snapshot() -> String {

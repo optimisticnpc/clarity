@@ -64,7 +64,7 @@ final class AppModel: ObservableObject {
             forName: NSWorkspace.didWakeNotification, object: nil, queue: .main
         ) { _ in MainActor.assumeIsolated {
             EventLog.record("Woke from sleep")
-            AppModel.shared?.scheduleRefresh(after: 1.5)
+            AppModel.shared?.scheduleRefresh(after: 0.5)
         } }
         NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.willSleepNotification, object: nil, queue: .main
@@ -153,9 +153,15 @@ final class AppModel: ObservableObject {
         lastError = nil
         do {
             try await scaling.setZoom(zoom, for: display, makeMain: profiles[display.key]?.makeMain ?? true)
-            // Mirroring and mode changes can reset the gamma tables, so put the colours back.
-            try? await Task.sleep(for: .milliseconds(400))
-            color.apply(profiles[display.key]?.color ?? .neutral, to: display.id)
+            // Mirroring and mode changes can reset the gamma tables, so put the colours back now,
+            // and once more shortly after in case macOS resets them late. The second pass doesn't
+            // hold anything up.
+            let colour = profiles[display.key]?.color ?? .neutral
+            color.apply(colour, to: display.id)
+            Task { [color] in
+                try? await Task.sleep(for: .milliseconds(500))
+                color.apply(colour, to: display.id)
+            }
             return true
         } catch {
             lastError = error.localizedDescription
@@ -216,7 +222,7 @@ final class AppModel: ObservableObject {
 
     // MARK: - Display changes
 
-    fileprivate func scheduleRefresh(after delay: Double = 0.6) {
+    fileprivate func scheduleRefresh(after delay: Double = 0.3) {
         pendingRefresh = true
         refreshWork?.cancel()
         let work = DispatchWorkItem { [weak self] in

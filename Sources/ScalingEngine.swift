@@ -75,8 +75,10 @@ final class ScalingEngine {
             let id = session.virtualDisplay.displayID
             let layout = Arrangement.capture(around: id)
             if try switchMode(session, to: zoom) {
-                // macOS re-lays out the screens after a resolution change; put the user's layout back.
-                try? await Task.sleep(for: .milliseconds(300))
+                // macOS re-lays out the screens after a resolution change; put the user's layout back
+                // once the new size has taken effect.
+                let points = Self.pointSize(for: display, zoom: zoom)
+                await Self.waitFor(upTo: 0.3) { Int(CGDisplayBounds(id).width) == points.width }
                 layout.apply(around: id, anchorBecomesMain: makeMain)
             }
             session.zoom = zoom
@@ -185,11 +187,15 @@ final class ScalingEngine {
         guard let virtualDisplay = CGVirtualDisplay(descriptor: descriptor) else { throw ScalingError.createFailed }
         guard virtualDisplay.apply(Self.settings(for: display)) else { throw ScalingError.applyFailed }
         guard await waitUntilOnline(virtualDisplay.displayID) else { throw ScalingError.virtualNeverAppeared }
+        EventLog.note("Virtual display online")
 
         // After the monitor was unplugged while the Mac was awake, macOS hands the MacBook's own
         // desktops back to the virtual display as it comes online (see Desktops). Swap them back
         // onto the MacBook before mirroring, which would otherwise merge them with the monitor's.
-        try? await Task.sleep(for: .milliseconds(800))
+        // Wait until the Dock has given the new screen its desktops (usually well under the cap).
+        let virtualUUID = Desktops.uuid(of: virtualDisplay.displayID)
+        await Self.waitFor(upTo: 0.8) { !(Desktops.byScreen()[virtualUUID] ?? []).isEmpty }
+        EventLog.note("Virtual display has its desktops")
         if let mac = Desktops.builtIn, Desktops.macBookDesktopsAreOn(virtualDisplay.displayID) {
             EventLog.record("The MacBook's desktops came back on the virtual display; swapping them back")
             if CGDisplayIsMain(mac) == 0 {
@@ -205,9 +211,10 @@ final class ScalingEngine {
         try switchMode(session, to: zoom)
         try Self.configure("mirror") { CGConfigureDisplayMirrorOfDisplay($0, display.id, virtualDisplay.displayID) }
         sessions[display.key] = session
-        // Put the virtual display where the monitor was (e.g. above the MacBook). Cosmetic, so a
-        // failure here is not fatal.
-        try? await Task.sleep(for: .milliseconds(300))
+        EventLog.note("Mirroring")
+        // Put the virtual display where the monitor was (e.g. above the MacBook), once the mirror
+        // has taken effect. Cosmetic, so a failure here is not fatal.
+        await Self.waitFor(upTo: 0.3) { CGDisplayMirrorsDisplay(display.id) == virtualDisplay.displayID }
         layout.apply(around: virtualDisplay.displayID, anchorBecomesMain: makeMain, previousAnchor: display.id)
     }
 
@@ -284,10 +291,19 @@ final class ScalingEngine {
         }
     }
 
+    /// Checks `done` every 50 ms until it is true or `seconds` have passed. Used instead of fixed
+    /// sleeps, so a step that macOS finishes quickly doesn't wait the full time.
+    private static func waitFor(upTo seconds: Double, _ done: () -> Bool) async {
+        let deadline = Date().addingTimeInterval(seconds)
+        while !done(), Date() < deadline {
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+    }
+
     private func waitUntilOnline(_ id: CGDirectDisplayID) async -> Bool {
-        for _ in 0..<30 {
+        for _ in 0..<60 {
             if CGDisplayIsOnline(id) != 0, CGDisplayCopyDisplayMode(id) != nil { return true }
-            try? await Task.sleep(for: .milliseconds(100))
+            try? await Task.sleep(for: .milliseconds(50))
         }
         return false
     }
