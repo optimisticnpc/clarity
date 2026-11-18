@@ -317,7 +317,21 @@ final class AppModel: ObservableObject {
 private func displayReconfigured(_ display: CGDirectDisplayID, _ flags: CGDisplayChangeSummaryFlags,
                                  _ userInfo: UnsafeMutableRawPointer?) {
     guard !flags.contains(.beginConfigurationFlag) else { return }
+    // When macOS first reports each change, to time how long it takes Clarity to react.
+    EventLog.note("macOS: display \(display) \(describe(flags))")
     DispatchQueue.main.async {
         MainActor.assumeIsolated { AppModel.shared?.scheduleRefresh() }
     }
+}
+
+/// Readable names for the kinds of change in a display reconfiguration, e.g. "added, set mode".
+private func describe(_ flags: CGDisplayChangeSummaryFlags) -> String {
+    let names: [(CGDisplayChangeSummaryFlags, String)] = [
+        (.addFlag, "added"), (.removeFlag, "removed"), (.enabledFlag, "enabled"),
+        (.disabledFlag, "disabled"), (.mirrorFlag, "mirrored"), (.unMirrorFlag, "unmirrored"),
+        (.setModeFlag, "set mode"), (.setMainFlag, "set main"), (.movedFlag, "moved"),
+        (.desktopShapeChangedFlag, "desktop shape changed"),
+    ]
+    let found = names.filter { flags.contains($0.0) }.map(\.1)
+    return found.isEmpty ? "changed" : found.joined(separator: ", ")
 }
